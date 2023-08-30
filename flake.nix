@@ -39,35 +39,35 @@
               cat > get-approle-credentials <<EOF
               #! $SHELL
               # Check that an approle name was provided
-              if [ -z "$1" ]; then
+              if [ -z "\$1" ]; then
                 echo "Usage: get-approle-credentials <approle_name>"
-                return 1
+                exit 1
               fi
 
               # Set the approle name
-              approle_name=$1
+              approle_name=\$1
 
               # Prompt for Vault login
               echo "Please login to Vault..."
               vault login
 
               # Check that login was successful
-              if [ $? -ne 0 ]; then
+              if [ \$? -ne 0 ]; then
                 echo "Vault login failed."
-                return 1
+                exit 1
               fi
 
-              mkdir -p /var/lib/${approle_name}
+              mkdir -p /var/lib/\$approle_name
 
               # Retrieve and save the role-id
-              role_id=$(${pkgs.vault} read -field=role_id auth/approle/role/${approle_name}/role-id)
-              echo ${role_id} > /var/lib/${approle_name}/role-id
+              role_id=\$(${pkgs.vault} read -field=role_id auth/approle/role/\$approle_name/role-id)
+              echo \$role_id > /var/lib/\$approle_name/role-id
 
               # Retrieve and save the secret-id
-              secret_id=$(${pkgs.vault} write -f -field=secret_id auth/approle/role/${approle_name}/secret-id)
-              echo ${secret_id} > /var/lib/${approle_name}/secret-id
+              secret_id=\$(${pkgs.vault} write -f -field=secret_id auth/approle/role/\$approle_name/secret-id)
+              echo \$secret_id > /var/lib/\$approle_name/secret-id
 
-              echo "AppRole credentials saved to '/var/lib/${approle_name}/role-id' and '/var/lib/${approle_name}/secret-id'."
+              echo "AppRole credentials saved to '/var/lib/\$approle_name/role-id' and '/var/lib/\$approle_name/secret-id'."
               EOF
               chmod +x get-approle-credentials
             '';
