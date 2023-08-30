@@ -29,24 +29,53 @@
       # A Nixpkgs overlay.
       overlay = final: prev: {
 
-        hello = with final; stdenv.mkDerivation rec {
-          name = "hello-${version}";
+        get-approle-credentials = with final; stdenv.mkDerivation rec {
+          name = "get-approle-credentials-${version}";
 
           unpackPhase = ":";
 
           buildPhase =
             ''
-              cat > hello <<EOF
+              cat > get-approle-credentials <<EOF
               #! $SHELL
-              echo "Hello Nixers!"
+              # Check that an approle name was provided
+              if [ -z "$1" ]; then
+                echo "Usage: get-approle-credentials <approle_name>"
+                return 1
+              fi
+
+              # Set the approle name
+              approle_name=$1
+
+              # Prompt for Vault login
+              echo "Please login to Vault..."
+              vault login
+
+              # Check that login was successful
+              if [ $? -ne 0 ]; then
+                echo "Vault login failed."
+                return 1
+              fi
+
+              mkdir -p /var/lib/${approle_name}
+
+              # Retrieve and save the role-id
+              role_id=$(${pkgs.vault} read -field=role_id auth/approle/role/${approle_name}/role-id)
+              echo ${role_id} > /var/lib/${approle_name}/role-id
+
+              # Retrieve and save the secret-id
+              secret_id=$(${pkgs.vault} write -f -field=secret_id auth/approle/role/${approle_name}/secret-id)
+              echo ${secret_id} > /var/lib/${approle_name}/secret-id
+
+              echo "AppRole credentials saved to '/var/lib/${approle_name}/role-id' and '/var/lib/${approle_name}/secret-id'."
               EOF
-              chmod +x hello
+              chmod +x get-approle-credentials
             '';
 
           installPhase =
             ''
               mkdir -p $out/bin
-              cp hello $out/bin/
+              cp get-approle-credentials $out/bin/
             '';
         };
 
@@ -55,21 +84,21 @@
       # Provide some binary packages for selected system types.
       packages = forAllSystems (system:
         {
-          inherit (nixpkgsFor.${system}) hello;
+          inherit (nixpkgsFor.${system}) get-approle-credentials;
         });
 
       # The default package for 'nix build'. This makes sense if the
       # flake provides only one package or there is a clear "main"
       # package.
-      defaultPackage = forAllSystems (system: self.packages.${system}.hello);
+      defaultPackage = forAllSystems (system: self.packages.${system}.get-approle-credentials);
 
       # A NixOS module, if applicable (e.g. if the package provides a system service).
-      nixosModules.hello =
+      nixosModules.get-approle-credentials =
         { pkgs, ... }:
         {
           nixpkgs.overlays = [ self.overlay ];
 
-          environment.systemPackages = [ pkgs.hello ];
+          environment.systemPackages = [ pkgs.get-approle-credentials ];
 
           #systemd.services = { ... };
         };
@@ -80,19 +109,19 @@
           with nixpkgsFor.${system};
 
           {
-            inherit (self.packages.${system}) hello;
+            inherit (self.packages.${system}) get-approle-credentials;
 
             # Additional tests, if applicable.
             test = stdenv.mkDerivation {
-              name = "hello-test-${version}";
+              name = "get-approle-credentials-test-${version}";
 
-              buildInputs = [ hello ];
+              buildInputs = [ get-approle-credentials ];
 
               unpackPhase = "true";
 
               buildPhase = ''
                 echo 'running some integration tests'
-                [[ $(hello) = 'Hello Nixers!' ]]
+                [[ $(get-approle-credentials) = 'Hello Nixers!' ]]
               '';
 
               installPhase = "mkdir -p $out";
@@ -109,7 +138,7 @@
               makeTest {
                 nodes = {
                   client = { ... }: {
-                    imports = [ self.nixosModules.hello ];
+                    imports = [ self.nixosModules.get-approle-credentials ];
                   };
                 };
 
@@ -117,7 +146,7 @@
                   ''
                     start_all()
                     client.wait_for_unit("multi-user.target")
-                    client.succeed("hello")
+                    client.succeed("get-approle-credentials")
                   '';
               };
           }
