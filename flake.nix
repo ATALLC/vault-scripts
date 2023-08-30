@@ -49,7 +49,8 @@
 
               # Prompt for Vault login
               echo "Please login to Vault..."
-              vault login
+              ${pkgs.vault}/bin/vault login || { echo "Vault login failed."; exit 1; }
+
 
               # Check that login was successful
               if [ \$? -ne 0 ]; then
@@ -60,11 +61,11 @@
               mkdir -p /var/lib/\$approle_name
 
               # Retrieve and save the role-id
-              role_id=\$(${pkgs.vault} read -field=role_id auth/approle/role/\$approle_name/role-id)
+              role_id=\$(${pkgs.vault}/bin/vault read -field=role_id auth/approle/role/\$approle_name/role-id)
               echo \$role_id > /var/lib/\$approle_name/role-id
 
               # Retrieve and save the secret-id
-              secret_id=\$(${pkgs.vault} write -f -field=secret_id auth/approle/role/\$approle_name/secret-id)
+              secret_id=\$(${pkgs.vault}/bin/vault write -f -field=secret_id auth/approle/role/\$approle_name/secret-id)
               echo \$secret_id > /var/lib/\$approle_name/secret-id
 
               echo "AppRole credentials saved to '/var/lib/\$approle_name/role-id' and '/var/lib/\$approle_name/secret-id'."
